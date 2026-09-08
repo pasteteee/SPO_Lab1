@@ -1,18 +1,8 @@
-// ============================================================================
-//  MainForm.cpp — точка входа в программу.
-//
-//  В Windows Forms на C++/CLI функция main запускает «цикл сообщений»
-//  (Application::Run), который живёт, пока открыто главное окно.
-//  Атрибут [STAThreadAttribute] обязателен для окон, диалогов и буфера обмена.
-// ============================================================================
-
 #include "MainForm.h"
 
 using namespace System;
 using namespace System::Windows::Forms;
 
-// Режим без окна: HalsteadMetrics.exe файл.pl --export результат.txt
-// Считает метрики и записывает таблицу в текстовый файл (для сборки отчёта).
 static int ExportTable(String^ perlFile, String^ outFile)
 {
     std::wstring code = HalsteadMetrics::ToStd(IO::File::ReadAllText(perlFile)->Replace(L"\r\n", L"\n"));
@@ -36,17 +26,15 @@ static int ExportTable(String^ perlFile, String^ outFile)
 [STAThreadAttribute]
 int main(cli::array<String^>^ args)
 {
-    // Экспорт таблицы без показа окна
     if (args->Length >= 3 && args[1] == L"--export")
     {
         return ExportTable(args[0], args[2]);
     }
 
-    HalsteadMetrics::Native::SetProcessDPIAware();   // чёткие шрифты при масштабе 125–200 %
-    Application::EnableVisualStyles();               // современный вид стандартных элементов
+    HalsteadMetrics::Native::SetProcessDPIAware();   
+    Application::EnableVisualStyles();             
     Application::SetCompatibleTextRenderingDefault(false);
 
-    // Если программу запустили с параметром (путь к .pl), откроем его сразу
     String^ file = (args->Length > 0) ? args[0] : nullptr;
 
     HalsteadMetrics::MainForm form(file);

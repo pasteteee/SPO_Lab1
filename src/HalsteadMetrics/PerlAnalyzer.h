@@ -1,30 +1,13 @@
 #pragma once
-// ============================================================================
-//  PerlAnalyzer.h — ядро лабораторной: разбор текста программы на Perl и
-//  подсчёт метрик Холстеда.
-//
-//  Это обычный (native) C++: никаких .NET-типов здесь нет, поэтому этот код
-//  можно использовать и в консольной программе, и в Windows Forms.
-//
-//  Напоминание по синтаксису C++:
-//    #pragma once      — заголовок подключается только один раз;
-//    std::wstring      — строка из «широких» символов wchar_t (UTF-16 в Windows),
-//                        нужна, чтобы позиции символов совпадали с RichTextBox;
-//    std::vector<T>    — динамический массив элементов типа T;
-//    enum class        — перечисление со своей областью имён (TokenKind::Operator).
-// ============================================================================
-
 #include <string>
 #include <vector>
 
-// Какой это элемент программы с точки зрения Холстеда
 enum class TokenKind
 {
     Operator,   // оператор: знак операции, ключевое слово, имя функции, скобки, ';'
     Operand     // операнд: переменная или константа (число, строка, регулярное выражение)
 };
 
-// Одна найденная в тексте лексема
 struct Token
 {
     std::wstring name;   // как показывать в таблице: L"+", L"( )", L"$sum", L"\"text\""
@@ -33,7 +16,6 @@ struct Token
     int          length; // длина фрагмента текста
 };
 
-// Строка итоговой таблицы: уникальный оператор/операнд и число его вхождений
 struct Entry
 {
     std::wstring     name;          // обозначение (например L";" или L"$sum")
@@ -41,7 +23,6 @@ struct Entry
     std::vector<int> tokenIndexes;  // номера лексем в AnalysisResult::tokens (для подсветки)
 };
 
-// Полный результат анализа
 struct AnalysisResult
 {
     std::vector<Token> tokens;     // все лексемы в порядке появления
@@ -84,9 +65,6 @@ private:
     bool braceIsDo   = false;      // ближайшая свёрнутая '{' открывает блок do { }
     bool stopped     = false;      // встретили __END__ — дальше не анализируем
 
-    // Что лежит в стеке скобок. Скобка либо самостоятельный оператор
-    // (группировка, индекс, блок), либо «свёрнута» в предыдущий оператор
-    // (скобки вызова функции, условия if, блока while и т.п.).
     enum class Bracket
     {
         Group,        // ( ) как оператор группировки
@@ -112,21 +90,20 @@ private:
     std::vector<std::wstring> userSubs;      // имена подпрограмм, объявленных через sub
     AnalysisResult result;
 
-    // ---------- вспомогательные методы ----------
     void reset(const std::wstring& code);
     void collectUserSubs();
     void addToken(const std::wstring& name, TokenKind kind, size_t start, size_t end);
     void addOperator(const std::wstring& name, size_t start, size_t end);
     void addOperand(const std::wstring& name, size_t start, size_t end);
 
-    wchar_t peek(size_t offset = 0) const;      // символ на pos + offset или 0
-    size_t  skipSpaces(size_t from) const;      // первая не-пробельная позиция начиная с from
-    bool    startsWith(const wchar_t* s) const; // текст в pos начинается с s?
-    std::wstring peekWord(size_t from) const;   // идентификатор, начинающийся в from
+    wchar_t peek(size_t offset = 0) const;      
+    size_t  skipSpaces(size_t from) const;     
+    bool    startsWith(const wchar_t* s) const;
+    std::wstring peekWord(size_t from) const;  
 
     void skipToEndOfLine();
     void skipPod();
-    void skipStatement();          // пропустить всё до ';' включительно (use strict; и т.п.)
+    void skipStatement();        
     void readHeredocBodies();
 
     void readWord();
@@ -135,7 +112,7 @@ private:
     bool readVariable();
     void readPunct();
     bool readQuoteLike(const std::wstring& word, size_t wordStart);
-    std::wstring readDelimited(wchar_t open, bool& ok);   // текст между разделителями
+    std::wstring readDelimited(wchar_t open, bool& ok);  
     void readRegexLiteral(wchar_t delimiter, size_t start);
 
     void finalize();

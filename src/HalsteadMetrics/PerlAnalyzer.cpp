@@ -1,32 +1,12 @@
-// ============================================================================
-//  PerlAnalyzer.cpp — реализация разбора программы на Perl для метрик Холстеда.
-//
-//  Идея: читаем текст слева направо по одному символу (это называется
-//  «сканер» или «лексер»), выделяем лексемы (числа, строки, переменные,
-//  ключевые слова, знаки операций, скобки) и сразу решаем, кто перед нами:
-//  ОПЕРАТОР или ОПЕРАНД. В конце считаем, сколько раз встретился каждый.
-//
-//  Правила подсчёта повторяют интерпретацию Холстеда из методички:
-//    * операнды — переменные и константы (числа, строки, регулярные выражения);
-//    * операторы — знаки операций, присваивание, ';', пара скобок как один
-//      оператор, управляющие операторы (if…elsif…else — один оператор),
-//      имена функций и подпрограмм;
-//    * скобки, принадлежащие оператору (условие if, аргументы функции,
-//      тело цикла), отдельно не считаются — они часть этого оператора;
-//    * запятая — разделитель списка, а не оператор (в таблице методички её нет);
-//    * метки, комментарии и директивы use/no/package не считаются.
-// ============================================================================
-
 #include "PerlAnalyzer.h"
 
-#include <algorithm>   // std::stable_sort, std::find
-#include <cmath>       // std::log2
+#include <algorithm>   
+#include <cmath>    
 #include <map>
 #include <set>
 
-namespace   // безымянное пространство имён: функции видны только в этом файле
+namespace  
 {
-    // ---------- классификация символов ----------
     bool isDigit(wchar_t c)      { return c >= L'0' && c <= L'9'; }
     bool isAlpha(wchar_t c)      { return (c >= L'a' && c <= L'z') || (c >= L'A' && c <= L'Z'); }
     bool isIdentStart(wchar_t c) { return isAlpha(c) || c == L'_' || c > 127; }   // c > 127: буквы не из ASCII
@@ -34,7 +14,6 @@ namespace   // безымянное пространство имён: функ�
     bool isSpace(wchar_t c)      { return c == L' ' || c == L'\t' || c == L'\r' || c == L'\n' || c == L'\f' || c == L'\v'; }
     bool isHexDigit(wchar_t c)   { return isDigit(c) || (c >= L'a' && c <= L'f') || (c >= L'A' && c <= L'F'); }
 
-    // Слово только из ЗАГЛАВНЫХ букв, цифр и '_' (STDIN, PI, OUTER) — константа или метка
     bool isUpperWord(const std::wstring& w)
     {
         if (w.empty()) return false;
@@ -43,7 +22,6 @@ namespace   // безымянное пространство имён: функ�
         return true;
     }
 
-    // Парная закрывающая скобка для разделителя квази-кавычек: q(...), s{...}{...}
     wchar_t closingFor(wchar_t open)
     {
         switch (open)
@@ -52,14 +30,12 @@ namespace   // безымянное пространство имён: функ�
         case L'[': return L']';
         case L'{': return L'}';
         case L'<': return L'>';
-        default:   return open;   // /.../ |...| !...! — тот же символ
+        default:   return open;  
         }
     }
 
-    const std::wstring kEllipsis = L"…";   // символ «…» как в таблице методички (Begin…End)
+    const std::wstring kEllipsis = L"…"; 
 
-    // Управляющие операторы: ключевое слово -> обозначение в таблице.
-    // Несколько служебных слов одного оператора (if / elsif / else) = ОДИН оператор.
     const std::map<std::wstring, std::wstring> kControl = {
         { L"if",      L"if" + kEllipsis + L"elsif" + kEllipsis + L"else" },
         { L"unless",  L"unless" + kEllipsis + L"else" },
@@ -76,14 +52,11 @@ namespace   // безымянное пространство имён: функ�
         { L"local",   L"local" },
     };
 
-    // Операторы, записываемые словами
     const std::set<std::wstring> kWordOps = {
         L"and", L"or", L"not", L"xor",
         L"lt", L"gt", L"le", L"ge", L"eq", L"ne", L"cmp",
     };
 
-    // Встроенные функции Perl (имя функции = оператор, как Readln и abs в методичке).
-    // Список не обязан быть полным: любое слово перед '(' тоже считается функцией.
     const std::set<std::wstring> kBuiltins = {
         L"print", L"printf", L"say", L"push", L"pop", L"shift", L"unshift", L"splice",
         L"reverse", L"sort", L"map", L"grep", L"join", L"split", L"keys", L"values",
@@ -99,13 +72,8 @@ namespace   // безымянное пространство имён: функ�
         L"truncate", L"utime", L"chmod", L"chown", L"glob", L"local",
     };
 
-    // Стандартные дескрипторы файлов — операнды
     const std::set<std::wstring> kFileHandles = { L"STDIN", L"STDOUT", L"STDERR", L"ARGV", L"DATA" };
 }
-
-// ============================================================================
-//  Служебные методы
-// ============================================================================
 
 void PerlAnalyzer::reset(const std::wstring& code)
 {
@@ -130,8 +98,6 @@ void PerlAnalyzer::reset(const std::wstring& code)
     result = AnalysisResult();
 }
 
-// Заранее собираем имена подпрограмм: "sub имя" где угодно в тексте.
-// Тогда вызов без скобок (например "greet;") тоже будет распознан как функция.
 void PerlAnalyzer::collectUserSubs()
 {
     size_t p = 0;
@@ -169,13 +135,11 @@ void PerlAnalyzer::addOperand(const std::wstring& name, size_t start, size_t end
     addToken(name, TokenKind::Operand, start, end);
 }
 
-// Символ на расстоянии offset от текущей позиции (0, если вышли за конец)
 wchar_t PerlAnalyzer::peek(size_t offset) const
 {
     return (pos + offset < n) ? src[pos + offset] : L'\0';
 }
 
-// Первая не-пробельная позиция, начиная с from
 size_t PerlAnalyzer::skipSpaces(size_t from) const
 {
     while (from < n && isSpace(src[from])) from++;
@@ -193,7 +157,6 @@ bool PerlAnalyzer::startsWith(const wchar_t* s) const
     return true;
 }
 
-// Идентификатор (буквы, цифры, '_', а также '::' внутри имени), начинающийся в from
 std::wstring PerlAnalyzer::peekWord(size_t from) const
 {
     size_t p = from;
@@ -212,7 +175,6 @@ void PerlAnalyzer::skipToEndOfLine()
     while (pos < n && src[pos] != L'\n') pos++;
 }
 
-// POD-документация: от строки "=что-то" до строки "=cut" включительно
 void PerlAnalyzer::skipPod()
 {
     while (pos < n)
@@ -223,11 +185,10 @@ void PerlAnalyzer::skipPod()
             return;
         }
         skipToEndOfLine();
-        if (pos < n) pos++;   // перешагнуть '\n'
+        if (pos < n) pos++;  
     }
 }
 
-// Пропустить оператор целиком (до ';'): use strict; use warnings; package Foo;
 void PerlAnalyzer::skipStatement()
 {
     while (pos < n && src[pos] != L';') pos++;
@@ -235,7 +196,6 @@ void PerlAnalyzer::skipStatement()
     prevIsTerm = false;
 }
 
-// Тела heredoc-строк (print <<"EOF"; ... EOF) начинаются со следующей строки
 void PerlAnalyzer::readHeredocBodies()
 {
     for (const Heredoc& h : pendingHeredocs)
@@ -266,18 +226,11 @@ void PerlAnalyzer::readHeredocBodies()
     atLineStart = true;
 }
 
-// ============================================================================
-//  Главный цикл
-// ============================================================================
-
 AnalysisResult PerlAnalyzer::analyze(const std::wstring& code)
 {
     reset(code);
     collectUserSubs();
 
-    // «Одноразовые» флаги: действуют только на ближайшую лексему.
-    // Их хранит объект (pendingParenFold и т.п.), а здесь мы их «снимаем»
-    // перед разбором очередной лексемы, чтобы они не действовали дальше.
     while (pos < n && !stopped)
     {
         wchar_t c = src[pos];
