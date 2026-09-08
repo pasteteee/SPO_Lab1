@@ -1,0 +1,40 @@
+# Visual Studio
+.vs/
+src/.vs/
+*.user
+*.suo
+*.vcxproj.user
+
+# Build output
+[Bb]in/
+[Oo]bj/
+Debug/
+Release/
+x64/
+x86/
+
+# Compiled binaries and intermediate files
+*.exe
+*.dll
+*.obj
+*.pdb
+*.ilk
+*.idb
+*.lib
+*.exp
+*.metagen
+*.recipe
+
+# C/C++ tooling
+ipch/
+*.sdf
+*.opensdf
+
+# Perl temporary files
+*.bak
+*.tmp
+*.swp
+
+# OS files
+.DS_Store
+Thumbs.db
